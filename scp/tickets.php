@@ -171,8 +171,17 @@ if($_POST && !$errors):
                  //Comments are not required on self-assignment (claim)
                  if($claim && !$_POST['assign_comments'])
                      $_POST['assign_comments'] = sprintf(__('Ticket claimed by %s'),$thisstaff->getName());
-                 elseif(!$_POST['assign_comments'])
-                     $errors['assign_comments'] = __('Assignment comments required');
+                 elseif(!$_POST['assign_comments']) {
+                     // BW Modification - allow re-assign without comment, autocomment with new assignee.
+                     $staff = Staff::lookup(substr($_POST['assignId'], 1)); // remove 's' from staff assignment parameter.
+                     $newAgent = null;
+                     if ($staff == null) {
+                         $newAgent = $_POST['assignId'];
+                     } else {
+                         $newAgent = $staff->getName();
+                     }
+                     $_POST['assign_comments'] = sprintf(__('Ticket re-assigned to %s by %s'),$newAgent,$thisstaff->getName());
+                 }
                  elseif(strlen($_POST['assign_comments'])<5)
                          $errors['assign_comments'] = __('Comment too short');
 
