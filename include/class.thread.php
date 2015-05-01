@@ -1102,6 +1102,16 @@ class ThreadEntry {
         $poster = $vars['poster'];
         if ($poster && is_object($poster))
             $poster = (string) $poster;
+			
+		// Strobe Technologies Ltd | 17/04/2015 | START - Capture Posted time information
+		// osTicket Version = v1.9.7
+		$time_spent = $vars['time_spent'];
+        if ($time_spent && is_object($time_spent))
+            $time_spent = (float) $time_spent;
+        $time_type = $vars['time_type'];
+        if ($time_type && is_object($time_type))
+            $time_type = (int) $time_type;
+		// Strobe Technologies Ltd | 17/04/2015 | END - Capture Posted time information
 
         $sql=' INSERT INTO '.TICKET_THREAD_TABLE.' SET created=NOW() '
             .' ,thread_type='.db_input($vars['type'])
@@ -1111,7 +1121,11 @@ class ThreadEntry {
             .' ,staff_id='.db_input($vars['staffId'])
             .' ,user_id='.db_input($vars['userId'])
             .' ,poster='.db_input($poster)
+			.' ,time_spent='.db_input($time_spent)
+            .' ,time_type='.db_input($time_type)
             .' ,source='.db_input($vars['source']);
+			// Strobe Technologies Ltd | 17/04/2015 | Added time_spent & time_type into SQL statement
+			// osTicket Version = v1.9.7
 
         if (!isset($vars['attachments']) || !$vars['attachments'])
             // Otherwise, body will be configured in a block below (after

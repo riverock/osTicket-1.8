@@ -76,10 +76,7 @@ if($ticket->isOverdue())
                     echo __('Edit'); ?></a>
             <?php
             }
-            if ($ticket->isOpen()
-                    && !$ticket->isAssigned()
-                    && $thisstaff->canAssignTickets()
-                    && $ticket->getDept()->isMember($thisstaff)) {?>
+            if ($ticket->isOpen() && !$ticket->isAssigned() && $thisstaff->canAssignTickets()) {?>
                 <a id="ticket-claim" class="action-button pull-right confirm-action" href="#claim"><i class="icon-user"></i> <?php
                     echo __('Claim'); ?></a>
 
@@ -96,6 +93,13 @@ if($ticket->isOverdue())
                  class="icon-file-alt"></i> <?php echo __('Ticket Thread'); ?></a>
                  <li><a class="no-pjax" target="_blank" href="tickets.php?id=<?php echo $ticket->getId(); ?>&a=print&notes=1"><i
                  class="icon-file-text-alt"></i> <?php echo __('Thread + Internal Notes'); ?></a>
+				 <!-- Strobe Technologies Ltd | 17/04/2015 | START - Adds bill printing to print menu -->
+				 <!--- osTicket Version = v1.9.7 -->
+				 <?php if ($cfg->isThreadTime()) { ?>
+					<li><a class="no-pjax" target="_blank" href="tickets_cost.php?id=<?php echo $ticket->getId(); ?>"><i
+					class="icon-file-text-alt"></i> <?php echo __('Billing Information'); ?></a>
+				<?php } ?>
+				 <!-- Strobe Technologies Ltd | 17/04/2015 | END - Adds bill printing to print menu -->
               </ul>
             </div>
             <div id="action-dropdown-more" class="action-dropdown anchor-right">
@@ -331,6 +335,16 @@ if($ticket->isOverdue())
                     <th nowrap><?php echo __('Last Response');?>:</th>
                     <td><?php echo Format::db_datetime($ticket->getLastRespDate()); ?></td>
                 </tr>
+				<?php
+				// Strobe Technologies Ltd | 17/04/2015 | START - Show Total Time Spent in Ticket information.
+				// osTicket Version = v1.9.7
+				if ($cfg->isTicketTime() || $cfg->isThreadTime()) { ?>
+				<tr>
+                    <th nowrap>Time Spent:</th>
+                    <td><?php echo $ticket->getTimeSpent(); ?></td>
+                </tr>
+				<?php }
+				// Strobe Technologies Ltd | 17/04/2015 | END - Show Total Time Spent in Ticket information. ?>
             </table>
         </td>
     </tr>
@@ -405,6 +419,17 @@ $tcount+= $ticket->getNumNotes();
                             echo Format::htmlchars($entry['name'] ?: $entry['poster']); ?></span>
                     </span>
                 </div>
+				<?php
+				// Strobe Technologies Ltd | 17/04/2015 | START - If statement testing if thread has time assigned to it and display it
+				// osTicket Version = v1.9.7
+				if ($cfg->isThreadTime()) {
+					if ($entry['time_spent'] !== '0.00') { ?>
+					<div>
+						<?php echo $ticket->convTimeSpent($entry['time_spent']) .' - '. $ticket->convTimeType($entry['time_type']); ?>
+					</div>
+				<?php }
+				}
+				// Strobe Technologies Ltd | 17/04/2015 | END - If statement testing if thread has time assigned to it and display it ?>
                 </th>
             </tr>
             <tr><td colspan="4" class="thread-body" id="thread-id-<?php
@@ -464,6 +489,13 @@ $tcount+= $ticket->getNumNotes();
         <li><a id="assign_tab" href="#assign"><?php echo $ticket->isAssigned()?__('Reassign Ticket'):__('Assign Ticket'); ?></a></li>
         <?php
         } ?>
+
+		<!-- Strobe Technologies Ltd  | 17/04/2015 | START - Add Time Tab to menu -->
+		<!-- osTicket Version = v1.9.7 -->
+		<?php if ($cfg->isTicketTime()) { ?>
+			<li><a id="time_tab" href="#time"><?php echo __('Add Time to Ticket'); ?></a></li>
+		<?php } ?>
+		<!-- Strobe Technologies Ltd  | 17/04/2015 | END - Add Time Tab to menu -->
     </ul>
     <?php
     if($thisstaff->canPostReply()) { ?>
@@ -636,6 +668,51 @@ print $response_form->getField('attachments')->render();
                     </select>
                 </td>
             </tr>
+			<?php
+			// Strobe Technologies Ltd | 17/04/2015 | START - Add Time Spent fields to Reply tab
+			// osTicket Version = v1.9.7
+			if ($cfg->isThreadTime()) {
+			if($ticket->isOpen()) { ?>
+            <tr>
+                <td width="120">
+                    <label><strong>Time Spent:</strong></label>
+                </td>
+                <td>
+                    <label for="current_time_spent"><strong>Current Time Spent:</strong></label>
+                    <?php echo $ticket->getTimeSpent().' ('.$ticket->getRealTimeSpent().')<br />';
+                    // show the current time spent (if any) ?>
+                    <label for="time_spent"><strong>Time Spent:</strong></label>
+                    <input type="text" name="time_spent" size="5"
+                    value="<?php if(isset($_POST['time_spent'])) echo $_POST['time_spent'];?>" />
+                    (Minutes)
+					<?php if ($cfg->isThreadTimer()) { ?>
+					<i class="icon-play" title="Start / Resume timer"></i>
+					<i class="icon-pause" title="Pause timer"></i>
+					<i class="icon-undo" title="Reset timer to zero"></i>
+					<?php } ?>
+                </td>
+            </tr>
+            <tr>
+				<td>
+                    <label for="time_type"><strong>Time Type:</strong></label>
+                </td>
+                <td>
+                    <select id="time_type" name="time_type">
+                    <?php
+					$criteria = "time-type";
+					$ttype_id = DynamicList::getTypes($criteria);
+
+					$list = DynamicListItem::objects();
+					foreach ($list as $item) {
+						if($item->getListId() == $ttype_id) {?>
+							<option value="<?php echo $item->getId(); ?>"> <?php echo $item->getValue(); ?> </option>
+						<?php }
+					}
+                    ?>
+                    </select>
+                </td>
+            </tr>
+            <?php }} // Strobe Technologies Ltd | 17/04/2015 | END - Add Time Spent fields to Reply tab ?>
          </tbody>
         </table>
         <p  style="padding:0 165px;">
@@ -715,6 +792,51 @@ print $note_form->getField('attachments')->render();
                     &nbsp;<span class='error'>*&nbsp;<?php echo $errors['note_status_id']; ?></span>
                 </td>
             </tr>
+			<?php
+			// Strobe Technologies Ltd | 17/04/2015 | START - Add Time Spent fields to Internal Note tab
+			// osTicket Version = v1.9.7
+			if ($cfg->isThreadTime()) {
+			if($ticket->isOpen()) { ?>
+            <tr>
+                <td width="120">
+                    <label><strong>Time Spent:</strong></label>
+                </td>
+                <td>
+                    <label for="current_time_spent"><strong>Current Time Spent:</strong></label>
+                    <?php echo $ticket->getTimeSpent().' ('.$ticket->getRealTimeSpent().')<br />';
+                    // show the current time spent (if any) ?>
+                    <label for="time_spent"><strong>Time Spent:</strong></label>
+                    <input type="text" name="time_spent" size="5"
+                    value="<?php if(isset($_POST['time_spent'])) echo $_POST['time_spent'];?>" />
+                    (Minutes)
+					<?php if ($cfg->isThreadTimer()) { ?>
+					<i class="icon-play" title="Start / Resume timer"></i>
+					<i class="icon-pause" title="Pause timer"></i>
+					<i class="icon-undo" title="Reset timer to zero"></i>
+					<?php } ?>
+                </td>
+            </tr>
+            <tr>
+				<td>
+                    <label for="time_type"><strong>Time Type:</strong></label>
+                </td>
+                <td>
+                    <select id="time_type" name="time_type">
+                    <?php
+					$criteria = "time-type";
+					$ttype_id = DynamicList::getTypes($criteria);
+
+					$list = DynamicListItem::objects();
+					foreach ($list as $item) {
+						if($item->getListId() == $ttype_id) {?>
+							<option value="<?php echo $item->getId(); ?>"> <?php echo $item->getValue(); ?> </option>
+						<?php }
+					}
+                    ?>
+                    </select>
+                </td>
+            </tr>
+            <?php }} // Strobe Technologies Ltd | 17/04/2015 | END - Add Time Spent fields to Internal Note tab ?>
         </table>
 
        <p  style="padding-left:165px;">
@@ -806,9 +928,7 @@ print $note_form->getField('attachments')->render();
                     <select id="assignId" name="assignId">
                         <option value="0" selected="selected">&mdash; <?php echo __('Select an Agent OR a Team');?> &mdash;</option>
                         <?php
-                        if ($ticket->isOpen()
-                                && !$ticket->isAssigned()
-                                && $ticket->getDept()->isMember($thisstaff))
+                        if($ticket->isOpen() && !$ticket->isAssigned())
                             echo sprintf('<option value="%d">'.__('Claim Ticket (comments optional)').'</option>', $thisstaff->getId());
 
                         $sid=$tid=0;
@@ -879,6 +999,40 @@ print $note_form->getField('attachments')->render();
     </form>
     <?php
     } ?>
+	<!-- Strobe Technologies Ltd | 17/04/2015 | START - Add Time Tab Form -->
+	<!-- osTicket Version = v1.9.7 -->
+	<?php if ($cfg->isTicketTime()) { ?>
+    <form id="time" action="tickets.php?id=<?php echo $ticket->getId(); ?>#time" name="time" method="post" enctype="multipart/form-data">
+        <?php csrf_token(); ?>
+        <input type="hidden" name="ticket_id" value="<?php echo $ticket->getId(); ?>">
+        <input type="hidden" name="a" value="time">
+        <table width="100%" border="0" cellspacing="0" cellpadding="3">
+			<p  style="padding-left:100px;">Add Required time to ticket.</p>
+			<p>&nbsp;</p>
+			<table>
+				<tr>
+					<td width="200px"><label for="current_time_spent"><strong>Current Time Spent:</strong></label></td>
+					<td><?php echo $ticket->getTimeSpent().' ('.$ticket->getRealTimeSpent().')';
+							// show the current time spent (if any) ?></td>
+				</tr>
+				<tr>
+					<td width="200px"><label for="time_spent"><strong>Time Spent:</strong></label></td>
+					<td><input type="text" name="time_spent" size="5" value="<?php if(isset($_POST['time_spent'])) echo $_POST['time_spent'];?>" />
+						(Minutes)
+					<i class="icon-play" title="Start / Resume timer"></i>
+					<i class="icon-pause" title="Pause timer"></i>
+					<i class="icon-undo" title="Reset timer to zero"></i>
+						<span class="error"><?php echo $errors['time_spent']; ?></span></td>
+				</tr>
+			</table>
+			<p  style="padding-left:165px;">
+				<input class="btn_sm" type="submit" value="<?php echo __('Add Time'); ?>">
+				<input class="btn_sm" type="reset" value="<?php echo __('Reset');?>">
+			</p>
+		</table>
+	</form>
+	<?php } ?>
+	<!-- Strobe Technologies Ltd | 17/04/2015 | END - Add Time Tab Form -->
 </div>
 <div style="display:none;" class="dialog" id="print-options">
     <h3><?php echo __('Ticket Print Options');?></h3>
@@ -995,6 +1149,7 @@ $(function() {
             }
         });
     });
+
 <?php
     // Set the lock if one exists
     if ($lock) { ?>
@@ -1010,4 +1165,41 @@ $(function() {
 }();
 <?php } ?>
 });
+
+// Strobe Technologies Ltd | 17/04/2015 | START - Ticket Time Timer
+// osTicket Version = v1.9.7
+$('input[name=time_spent]').val(0);		// sets default value to 0 minutes
+$('i.icon-play').hide();
+var timerOn = true;						// var to store if the timer is on or off
+
+setInterval(function() {
+    $('input[name=time_spent]').each(function() {
+        if (timerOn) $(this).val(parseInt($(this).val()) + 1);
+    });
+}, 60000);
+
+$('i.icon-undo').click(function() {
+	$('input[name=time_spent]').val(0);		// sets default value to 0 minutes
+	return false;
+});
+
+$('i.icon-play').click(function() {
+	timerOn = true;
+	$('i.icon-play').hide();
+	$('i.icon-pause').show();
+	return false;
+});
+$('i.icon-pause').click(function() {
+	timerOn = false;
+	$('i.icon-pause').hide();
+	$('i.icon-play').show();
+	return false;
+});
+// Strobe Technologies Ltd | 17/04/2015 | END - Ticket Time Timer
 </script>
+<style>
+	i.icon-undo, i.icon-play, i.icon-pause {
+		cursor: pointer;
+		margin-left: 5px;
+	}
+</style>

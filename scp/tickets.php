@@ -58,7 +58,53 @@ if($_POST && !$errors):
         //More coffee please.
         $errors=array();
         $lock=$ticket->getLock(); //Ticket lock if any
+
+		// Strobe Technologies Ltd | 17/04/2015 | START - Collect Total Spent from results
+		// osTicket Version = v1.9.7
+		if($_POST['time_spent']) {
+			$ticket->timeSpent($_POST['time_spent']);
+		}
+		// Strobe Technologies Ltd | 17/04/2015 | END - Collect Total Spent from results
+
         switch(strtolower($_POST['a'])):
+		// Strobe Technologies Ltd | 17/04/2015 | START - Add time case / switch
+		// osTicket Version = v1.9.7
+		case 'time':
+			if(!$_POST['time_spent'])
+				$errors['time_spent']=__('Time required');
+
+			//Use locks to avoid double replies
+            if($lock && $lock->getStaffId()!=$thisstaff->getId())
+                $errors['err']=__('Action Denied. Ticket is locked by someone else!');
+
+			//If no error...do the do.
+            $vars = $_POST;
+			
+			if(!$errors && ($response=$ticket->timeSpent($_POST['time_spent']))) {
+                $msg = sprintf(__('%s: Time posted successfully'),
+                        sprintf(__('Ticket #%s'),
+                            sprintf('<a href="tickets.php?id=%d"><b>%s</b></a>',
+                                $ticket->getId(), $ticket->getNumber()))
+                        );
+
+
+                // Remove staff's locks
+                TicketLock::removeStaffLocks($thisstaff->getId(),
+                        $ticket->getId());
+
+                // Cleanup response draft for this user
+                Draft::deleteForNamespace(
+                    'ticket.response.' . $ticket->getId(),
+                    $thisstaff->getId());
+
+                // Go back to the ticket listing page on reply
+                $ticket = null;
+
+            } elseif(!$errors['err']) {
+                $errors['err']=__('Unable to post the time. Correct the errors below and try again!');
+            }
+			break;
+			// Strobe Technologies Ltd | 17/04/2015 | END - Add time case / switch
         case 'reply':
             if(!$thisstaff->canPostReply())
                 $errors['err'] = __('Action denied. Contact admin for access');
@@ -171,17 +217,8 @@ if($_POST && !$errors):
                  //Comments are not required on self-assignment (claim)
                  if($claim && !$_POST['assign_comments'])
                      $_POST['assign_comments'] = sprintf(__('Ticket claimed by %s'),$thisstaff->getName());
-                 elseif(!$_POST['assign_comments']) {
-                     // BW Modification - allow re-assign without comment, autocomment with new assignee.
-                     $staff = Staff::lookup(substr($_POST['assignId'], 1)); // remove 's' from staff assignment parameter.
-                     $newAgent = null;
-                     if ($staff == null) {
-                         $newAgent = $_POST['assignId'];
-                     } else {
-                         $newAgent = $staff->getName();
-                     }
-                     $_POST['assign_comments'] = sprintf(__('Ticket re-assigned to %s by %s'),$newAgent,$thisstaff->getName());
-                 }
+                 elseif(!$_POST['assign_comments'])
+                     $errors['assign_comments'] = __('Assignment comments required');
                  elseif(strlen($_POST['assign_comments'])<5)
                          $errors['assign_comments'] = __('Comment too short');
 
@@ -462,7 +499,7 @@ if($thisstaff->canCreateTickets()) {
 }
 
 
-$ost->addExtraHeader('<script type="text/javascript" src="js/ticket.js"></script>');
+$ost->addExtraHeader('<script type="text/javascript" src="js/ticket.js?4be5782"></script>');
 $ost->addExtraHeader('<meta name="tip-namespace" content="tickets.queue" />',
     "$('#content').data('tipNamespace', 'tickets.queue');");
 
